@@ -1,0 +1,52 @@
+name: Sync Plugins
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [plugin-updated]
+
+concurrency:
+  group: sync-plugins
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.COLONY_PAT }}
+
+      - name: Configure git
+        run: |
+          git config user.name "Colony Bot"
+          git config user.email "colony-bot@users.noreply.github.com"
+
+      # Syncs all plugins on every run regardless of dispatch payload.
+      # Optimizing to sync only the triggering plugin is a future improvement.
+      - name: Sync all plugins from colony.json
+        env:
+          COLONY_PAT: ${{ secrets.COLONY_PAT }}
+        run: |
+          jq -c '.plugins[]' colony.json | while read -r plugin; do
+            name=$(echo "$plugin" | jq -r '.name')
+            repo=$(echo "$plugin" | jq -r '.repo')
+            branch=$(echo "$plugin" | jq -r '.branch')
+            path=$(echo "$plugin" | jq -r '.path')
+
+            echo "::group::Syncing $name from $repo ($branch)"
+            git subtree pull \
+              --prefix="$path" \
+              "https://x-access-token:${COLONY_PAT}@github.com/${repo}.git" \
+              "$branch" \
+              --squash \
+              -m "sync: update $name" \
+            || echo "⚠️  $name: already up to date or pull failed"
+            echo "::endgroup::"
+          done
+
+      - name: Push changes
+        run: git push origin main
