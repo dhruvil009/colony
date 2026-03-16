@@ -24,6 +24,6 @@ Then install any plugin:
 
 Run `/plugin` and go to the **Discover** tab to browse all available plugins.
 
-## Contributing a Plugin
+## Contributing
 
-See the [contribution guide](plugins/) for how to submit a plugin to Colony.
+Want to add your plugin? See [CONTRIBUTING.md](CONTRIBUTING.md).
