@@ -2,31 +2,40 @@
 
 ## Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and working
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) v1.0.33+ installed and working
 - Python 3.10 or later
-- Git
+- No pip packages required — HiveScanner uses only the Python standard library
 
-## Install via Plugin Marketplace (Recommended)
+## Install via Colony Marketplace (Recommended)
 
-Add the HiveScanner repo as a marketplace source and install:
+Add [Colony](https://github.com/dhruvil009/Colony), the plugin marketplace, and install HiveScanner from it. This gives you access to all Colony plugins and automatic updates:
 
-```bash
-claude plugin marketplace add github:dhruvil009/hivescanner
-claude plugin install hivescanner
+```
+/plugin marketplace add dhruvil009/Colony
+/plugin install hivescanner@dhruvil009-Colony
 ```
 
-This installs HiveScanner permanently and makes it available in all sessions.
+Browse all available plugins with `/plugin` under the **Discover** tab, or visit [Colony on GitHub](https://github.com/dhruvil009/Colony).
 
-## Install via --plugin-dir (Session Only)
+## Install Standalone
 
-Clone the repo anywhere and load it for a single session:
+If you only want HiveScanner without the full marketplace:
 
-```bash
-git clone https://github.com/dhruvil009/hivescanner.git ~/hivescanner
-claude --plugin-dir ~/hivescanner
+```
+/plugin marketplace add dhruvil009/hivescanner
+/plugin install hivescanner@dhruvil009-hivescanner
 ```
 
-This is useful for trying HiveScanner before committing to a permanent install.
+This loads HiveScanner's `/hive` skill in every Claude Code session.
+
+## Manage Your Installation
+
+```
+/plugin                              # Browse and manage plugins (interactive UI)
+/plugin disable hivescanner@...      # Temporarily disable
+/plugin enable hivescanner@...       # Re-enable
+/plugin uninstall hivescanner@...    # Remove completely
+```
 
 ## Verify Installation
 
