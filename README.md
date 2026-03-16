@@ -55,19 +55,3 @@ The sync workflow reads `colony.json` dynamically — no workflow changes needed
 2. The plugin's `notify-colony.yml` workflow sends a `repository_dispatch` event to Colony
 3. Colony's `sync-plugins.yml` workflow reads `colony.json`, runs `git subtree pull` for each plugin, and pushes any updates
 4. As a fallback, the sync workflow also runs on a schedule (every 6 hours)
-
-## GitHub Secrets Setup
-
-Colony's sync workflow needs a GitHub Personal Access Token (PAT) to pull from plugin repos and push updates. The default `GITHUB_TOKEN` is insufficient because it lacks cross-repo access.
-
-### On the Colony repo
-
-1. Create a PAT at https://github.com/settings/tokens with `repo` scope
-2. Go to Colony repo → Settings → Secrets and variables → Actions
-3. Add a secret named `COLONY_PAT` with the PAT value
-
-### On each plugin repo
-
-1. Use the same PAT (or create a separate one with `repo` scope)
-2. Go to plugin repo → Settings → Secrets and variables → Actions
-3. Add a secret named `COLONY_DISPATCH_TOKEN` with the PAT value
