@@ -1,0 +1,5 @@
+name = "hivescanner"
+compatibility_date = "2024-03-15"
+
+[assets]
+directory = "website/.vitepress/dist"
