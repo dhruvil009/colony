@@ -4,21 +4,16 @@ Get HiveScanner running in under 5 minutes.
 
 ## 1. Install
 
-Add the HiveScanner marketplace and install the plugin:
+Add [Colony](https://github.com/dhruvil009/Colony) and install HiveScanner:
 
-```bash
-claude plugin marketplace add github:dhruvil009/hivescanner
-claude plugin install hivescanner
+```
+/plugin marketplace add dhruvil009/Colony
+/plugin install hivescanner@dhruvil009-Colony
 ```
 
-Or clone the repo and load it directly for a single session:
+No pip packages needed — HiveScanner uses only the Python standard library.
 
-```bash
-git clone https://github.com/dhruvil009/hivescanner.git ~/hivescanner
-claude --plugin-dir ~/hivescanner
-```
-
-See [Installation](/getting-started/installation) for more details.
+See [Installation](/getting-started/installation) for standalone install and more details.
 
 ## 2. Start the Setup Wizard
 

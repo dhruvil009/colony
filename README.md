@@ -39,20 +39,30 @@ Everything is surfaced inline in your Claude Code session. Dismiss with a word, 
 
 ## Quick Start
 
-### 1. Install
+### Prerequisites
 
-Add the HiveScanner marketplace and install the plugin:
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) v1.0.33+ installed and working
+- Python 3.10+
+- No pip packages required — HiveScanner uses only the Python standard library
 
-```bash
-claude plugin marketplace add github:dhruvil009/hivescanner
-claude plugin install hivescanner
+### 1. Install via Colony Marketplace (Recommended)
+
+Add [Colony](https://github.com/dhruvil009/Colony), the plugin marketplace, and install HiveScanner from it. This gives you access to all Colony plugins and automatic updates:
+
+```
+/plugin marketplace add dhruvil009/Colony
+/plugin install hivescanner@dhruvil009-Colony
 ```
 
-Or clone the repo and load it for a single session:
+Browse all available plugins with `/plugin` under the **Discover** tab, or visit [Colony on GitHub](https://github.com/dhruvil009/Colony).
 
-```bash
-git clone https://github.com/dhruvil009/hivescanner.git ~/hivescanner
-claude --plugin-dir ~/hivescanner
+### 1b. Install Standalone
+
+If you only want HiveScanner without the marketplace:
+
+```
+/plugin marketplace add dhruvil009/hivescanner
+/plugin install hivescanner@dhruvil009-hivescanner
 ```
 
 ### 2. Start the setup wizard
@@ -65,12 +75,19 @@ HiveScanner launches an interactive wizard that walks you through configuration.
 
 ### 3. Configure your sources
 
-The wizard will ask you to set up:
+The wizard walks you through the core scanners:
 
 - **GitHub** -- which repos to watch, whether to track reviews, CI, and @mentions (requires `gh` CLI or `$GITHUB_TOKEN`)
 - **Slack** -- optional; which channels and DMs to monitor (requires `$SLACK_TOKEN`)
-- **Calendar** -- optional; Google Calendar integration for meeting prep and reminders
+- **Calendar** -- optional; Google Calendar integration for meeting prep and reminders (requires `gws` CLI)
 - **git_status** -- enabled by default; watches local directories for uncommitted changes, stale branches, merge conflicts, and forgotten stashes
+
+Additional built-in scanners can be enabled after setup by editing `~/.hivescanner/config.json`:
+
+- **GChat** -- Google Chat DMs and @mentions (requires `gws` CLI)
+- **WhatsApp** -- incoming messages from configured chats (requires `whatsapp-cli`)
+- **Email** -- new emails and urgent VIP sender alerts via Gmail (requires `gws` CLI)
+- **Weather** -- daily briefing and temperature swing alerts (uses [wttr.in](https://wttr.in), no API key needed)
 
 ### 4. Set your poll interval
 
@@ -202,11 +219,11 @@ HiveScanner's Python workers handle all the polling deterministically. The LLM (
 | **Security** | Catastrophic (CVEs, malicious skills) | Container isolation | 6-gate safety + sandboxed scanners |
 | **Extensibility** | ClawHub (compromised) | None | Community scanner ecosystem |
 | **Architecture** | 500K LOC, 70+ deps | ~500 LOC TypeScript | Minimal Python pollers + plugin manifest |
-| **Install** | Clone + configure gateway | Docker container | `git clone` -> `/hive` |
+| **Install** | Clone + configure gateway | Docker container | `/plugin install` (zero deps) |
 
 ### Plugin-native, not another process
 
-HiveScanner is a Claude Code plugin, not a standalone application. No separate gateway server. No port binding. No Docker container to manage. Type `/hive`, configure once, and it runs inside the tool you already have open. One less thing in your process manager.
+HiveScanner is a Claude Code plugin, not a standalone application. No separate gateway server. No port binding. No Docker container to manage. Install from the [Colony marketplace](https://github.com/dhruvil009/Colony) with `/plugin install`, run `/hive`, configure once, and it runs inside the tool you already have open. One less thing in your process manager.
 
 ---
 
