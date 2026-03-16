@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "plugins": [
+    {
+      "name": "hivescanner",
+      "description": "Unified notification scanner — GitHub, Slack, Discord, and more",
+      "repo": "dhruvil009/hivescanner",
+      "branch": "main",
+      "path": "plugins/hivescanner",
+      "category": "productivity",
+      "tags": ["notifications", "scanning", "github", "slack"]
+    }
+  ]
+}
