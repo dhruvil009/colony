@@ -1,0 +1,20 @@
+{
+  "name": "colony",
+  "owner": {
+    "name": "Dhruvil Shah"
+  },
+  "metadata": {
+    "description": "A plugin marketplace for Claude Code — curated plugins, skills, and tools.",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "hivescanner",
+      "source": "./plugins/hivescanner",
+      "description": "Zero-token background monitoring for Claude Code — watches GitHub, Slack, and more.",
+      "version": "1.0.0",
+      "category": "productivity",
+      "tags": ["notifications", "scanning", "github", "slack", "monitoring"]
+    }
+  ]
+}
