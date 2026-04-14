@@ -12,6 +12,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 from dep_installer import preflight
 
 HIVESCANNER_HOME = Path.home() / ".hivescanner"
@@ -26,6 +31,7 @@ MAX_POLLEN_PER_CYCLE = 20
 DEFAULT_POLL_INTERVAL = 300
 
 _shutdown_requested = False
+_META_LOCK_FD = None
 
 
 def handle_signal(signum, frame):
@@ -35,7 +41,8 @@ def handle_signal(signum, frame):
 
 signal.signal(signal.SIGTERM, handle_signal)
 signal.signal(signal.SIGINT, handle_signal)
-signal.signal(signal.SIGHUP, handle_signal)
+if hasattr(signal, "SIGHUP"):
+    signal.signal(signal.SIGHUP, handle_signal)
 
 
 def _utc_now_z() -> str:
@@ -65,27 +72,60 @@ def is_pid_running(pid: int) -> bool:
 
 
 def acquire_lock() -> None:
+    # POSIX path uses fcntl.flock for atomic mutual exclusion; Windows falls through to legacy O_EXCL logic (P2 #13).
+    global _META_LOCK_FD
     HIVESCANNER_HOME.mkdir(parents=True, exist_ok=True)
+
+    if fcntl is None:
+        try:
+            fd = os.open(str(LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+        except FileExistsError:
+            try:
+                pid = int(LOCK_FILE.read_text().strip())
+            except (ValueError, OSError):
+                pid = -1
+            if is_pid_running(pid):
+                output_error(f"Another scanner loop running (PID {pid})")
+                sys.exit(1)
+            LOCK_FILE.unlink(missing_ok=True)
+            fd = os.open(str(LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+        return
+
+    meta = str(LOCK_FILE) + ".flock"
+    _META_LOCK_FD = os.open(meta, os.O_CREAT | os.O_RDWR, 0o644)
     try:
-        fd = os.open(str(LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(os.getpid()).encode())
-        os.close(fd)
-    except FileExistsError:
+        fcntl.flock(_META_LOCK_FD, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
         try:
             pid = int(LOCK_FILE.read_text().strip())
         except (ValueError, OSError):
             pid = -1
-        if is_pid_running(pid):
-            output_error(f"Another scanner loop running (PID {pid})")
-            sys.exit(1)
-        LOCK_FILE.unlink(missing_ok=True)
-        fd = os.open(str(LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(os.getpid()).encode())
-        os.close(fd)
+        output_error(f"Another scanner loop running (PID {pid})")
+        os.close(_META_LOCK_FD)
+        _META_LOCK_FD = None
+        sys.exit(1)
+
+    LOCK_FILE.write_text(str(os.getpid()))
 
 
 def release_lock() -> None:
+    global _META_LOCK_FD
     LOCK_FILE.unlink(missing_ok=True)
+    if _META_LOCK_FD is not None:
+        if fcntl is not None:
+            try:
+                fcntl.flock(_META_LOCK_FD, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        try:
+            os.close(_META_LOCK_FD)
+        except OSError:
+            pass
+        _META_LOCK_FD = None
 
 
 def load_watermarks() -> dict:
@@ -264,8 +304,9 @@ def check_acted_pollen(config: dict, scanners: dict, third_party: dict[str, Path
 
 def poll_all(config: dict, scanners: dict, third_party: dict[str, Path], watermarks: dict) -> tuple[list, list]:
     """Poll all enabled scanners. Returns (pollen, acted_ids)."""
-    all_pollen = []
-    new_watermarks = {}
+    tagged_pollen: list[tuple[str, dict]] = []
+    new_watermarks: dict[str, str] = {}
+    contributed_counts: dict[str, int] = {}
 
     for scanner_name, scanner_config in config.get("scanners", {}).items():
         if not scanner_config.get("enabled"):
@@ -273,28 +314,41 @@ def poll_all(config: dict, scanners: dict, third_party: dict[str, Path], waterma
 
         watermark = watermarks.get(scanner_name, "1970-01-01T00:00:00Z")
 
+        pollen = None
+        new_wm = None
         if scanner_name in scanners:
             try:
                 pollen, new_wm = scanners[scanner_name].poll(scanner_config, watermark)
-                new_watermarks[scanner_name] = new_wm
-                all_pollen.extend(pollen)
             except Exception as e:
                 print(f"[scanner] Error polling {scanner_name}: {e}", file=sys.stderr)
-
+                continue
         elif scanner_name in third_party:
             try:
                 pollen, new_wm = _poll_sandboxed(third_party[scanner_name], scanner_config, watermark)
-                new_watermarks[scanner_name] = new_wm
-                all_pollen.extend(pollen)
             except Exception as e:
                 print(f"[scanner] Error polling sandboxed {scanner_name}: {e}", file=sys.stderr)
+                continue
+        else:
+            continue
 
-    # Batch cap
-    if len(all_pollen) > MAX_POLLEN_PER_CYCLE:
-        all_pollen = all_pollen[:MAX_POLLEN_PER_CYCLE]
-        # DON'T advance watermarks — remaining re-fetched next cycle
-    else:
-        watermarks.update(new_watermarks)
+        new_watermarks[scanner_name] = new_wm
+        contributed_counts[scanner_name] = len(pollen)
+        for item in pollen:
+            tagged_pollen.append((scanner_name, item))
+
+    if len(tagged_pollen) > MAX_POLLEN_PER_CYCLE:
+        tagged_pollen = tagged_pollen[:MAX_POLLEN_PER_CYCLE]
+
+    kept_counts: dict[str, int] = {}
+    for scanner_name, _ in tagged_pollen:
+        kept_counts[scanner_name] = kept_counts.get(scanner_name, 0) + 1
+
+    for scanner_name, new_wm in new_watermarks.items():
+        # Only advance watermark when all of this scanner's items survived the cap.
+        if kept_counts.get(scanner_name, 0) == contributed_counts.get(scanner_name, 0):
+            watermarks[scanner_name] = new_wm
+
+    all_pollen = [item for _, item in tagged_pollen]
 
     acted_ids = check_acted_pollen(config, scanners, third_party)
     return all_pollen, acted_ids
@@ -319,7 +373,15 @@ def main():
 
             if pollen:
                 known_ids = load_pollen_ids()
-                new_pollen = [p for p in pollen if p["id"] not in known_ids]
+                new_pollen = []
+                for p in pollen:
+                    pid = p.get("id")
+                    if not pid:
+                        print(f"[scanner] dropping pollen without id from source={p.get('source', 'unknown')}", file=sys.stderr)
+                        continue
+                    if pid in known_ids:
+                        continue
+                    new_pollen.append(p)
             else:
                 new_pollen = []
 
